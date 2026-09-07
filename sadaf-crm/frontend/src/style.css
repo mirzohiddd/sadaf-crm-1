@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* Aksent rang — fon rasmi/rangi tanlanganda store avtomatik yangilaydi */
+  --accent: #f08a63;
+  --accent-dark: #d9743f;
+  --accent-soft: rgba(240, 138, 99, .18);
+  --accent-ring: rgba(240, 138, 99, .35);
+
+  /* Kartalar foni — fon rasmi tanlanganda store shaffofga o'zgartiradi */
+  --card-bg: #ffffff;
+  --card-blur: none;
+  --card-border: rgb(241 245 249);   /* slate-100 */
+}
+
+body {
+  @apply text-slate-800 font-sans antialiased;
+  background: transparent;
+}
+
+/* Orqa fon rasm bo'lganda kartalar biroz shaffofroq ko'rinadi */
+#app { min-height: 100vh; }
+
+@layer components {
+  .card {
+    @apply rounded-2xl shadow-card border;
+    background: var(--card-bg);
+    border-color: var(--card-border);
+    -webkit-backdrop-filter: var(--card-blur);
+    backdrop-filter: var(--card-blur);
+  }
+  .nav-link {
+    @apply relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-[15px] font-medium
+           text-slate-300 transition-colors;
+  }
+  .nav-link:hover {
+    @apply bg-white/5 text-white;
+  }
+  .nav-link.router-link-active {
+    @apply bg-white/10 text-white;
+  }
+  .nav-link.router-link-active svg { color: var(--accent); }
+  /* Faol bo'limning chap chetidagi to'q sariq chiziq */
+  .nav-bar {
+    @apply absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-transparent transition-colors;
+  }
+  .nav-link.router-link-active .nav-bar {
+    background: var(--accent);
+  }
+  .badge {
+    @apply inline-flex items-center rounded-md px-2 py-1 text-xs font-medium;
+  }
+  .field {
+    @apply w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition;
+  }
+  .field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+  .btn-primary {
+    @apply w-full rounded-xl py-3 text-sm font-semibold text-white transition focus:outline-none;
+    background: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-primary:focus { box-shadow: 0 0 0 3px var(--accent-ring); }
+
+  /* Aksent rangga bog'langan yordamchi klasslar */
+  .btn-accent {
+    @apply rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition;
+    background: var(--accent);
+  }
+  .btn-accent:hover { background: var(--accent-dark); }
+  .text-accent { color: var(--accent); }
+  .bg-accent { background: var(--accent); }
+  .bg-accent-soft { background: var(--accent-soft); }
+  .ring-accent { box-shadow: 0 0 0 2px var(--accent); }
+  .border-accent { border-color: var(--accent); }
+}
+
+
+/* ——— Animatsiyalar ——— */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(.96) translateY(8px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+@layer utilities {
+  .animate-fade-up { animation: fade-up .45s cubic-bezier(.22,.8,.32,1) both; }
+  .animate-fade-in { animation: fade-in .35s ease both; }
+  .animate-pop-in  { animation: pop-in .28s cubic-bezier(.22,.8,.32,1) both; }
+  .animate-slide-left  { animation: slide-left .5s cubic-bezier(.22,.8,.32,1) both; }
+  .animate-slide-right { animation: slide-right .5s cubic-bezier(.22,.8,.32,1) both; }
+
+  /* Ro'yxatdagi elementlarni ketma-ket chiqarish */
+  .stagger > * { animation: fade-up .45s cubic-bezier(.22,.8,.32,1) both; }
+  .stagger > *:nth-child(1) { animation-delay: .02s }
+  .stagger > *:nth-child(2) { animation-delay: .06s }
+  .stagger > *:nth-child(3) { animation-delay: .10s }
+  .stagger > *:nth-child(4) { animation-delay: .14s }
+  .stagger > *:nth-child(5) { animation-delay: .18s }
+  .stagger > *:nth-child(6) { animation-delay: .22s }
+  .stagger > *:nth-child(7) { animation-delay: .26s }
+  .stagger > *:nth-child(8) { animation-delay: .30s }
+  .stagger > *:nth-child(n+9) { animation-delay: .34s }
+
+  .lift { @apply transition duration-200; }
+  .lift:hover { @apply -translate-y-0.5 shadow-lg; }
+}
+
+/* Sahifa almashinuvi — chapdan o'ngga sirg'alib chiqadi */
+.page-enter-active { transition: opacity .32s ease, transform .32s cubic-bezier(.22,.8,.32,1); }
+.page-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.page-enter-from { opacity: 0; transform: translateX(28px); }
+.page-leave-to   { opacity: 0; transform: translateX(-18px); }
+
+/* Modal animatsiyasi */
+.modal-enter-active { transition: opacity .22s ease; }
+.modal-leave-active { transition: opacity .18s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-active .modal-panel { animation: pop-in .28s cubic-bezier(.22,.8,.32,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, .stagger > * { animation: none !important; transition: none !important; }
+}
