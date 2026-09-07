@@ -41,12 +41,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    # Development qulayligi: localhost/127.0.0.1 dagi ISTALGAN port
-    # (frontend, landing va h.k.) har doim ruxsat etiladi — shuning uchun
-    # landing yoki frontend portini o'zgartirsangiz ham CORS xatosi
-    # chiqmaydi. Productionda haqiqiy domenlar CORS_ORIGINS orqali
-    # (.env dagi) alohida ruxsat etiladi.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    # Localhost va har qanday *.vercel.app domenlariga (Preview hamda Production) ruxsat beradi
+    allow_origin_regex=r"https://.*\.vercel\.app|http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
