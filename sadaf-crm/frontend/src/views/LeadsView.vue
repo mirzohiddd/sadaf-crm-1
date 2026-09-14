@@ -95,20 +95,19 @@ function openEdit(lead) {
   if (lead?.id != null) markLeadSeen(lead.id)
 }
 
+// Barcha maydonlar ixtiyoriy — forma har doim saqlanadi, validatsiya yo'q.
 function validate() {
   clearErrors()
-  if (!form.name.trim()) errors.name = 'Ism familiyani kiriting.'
-  if (!/^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/.test(form.phone.trim()))
-    errors.phone = "Telefonni +998 XX XXX XX XX ko'rinishida kiriting."
-  if (!form.tour) errors.tour = 'Turni tanlang.'
-  if (!(Number(form.people) > 0)) errors.people = 'Odamlar sonini kiriting.'
-  if (form.amount === '' || Number(form.amount) < 0) errors.amount = 'Summani kiriting.'
-  return !Object.keys(errors).length
+  return true
 }
 
 function save() {
   if (!validate()) return
-  const payload = { ...form, people: Number(form.people), amount: Number(form.amount) }
+  const payload = {
+    ...form,
+    people: form.people === '' ? 0 : Number(form.people) || 0,
+    amount: form.amount === '' ? 0 : Number(form.amount) || 0
+  }
   form.id ? leadsApi.update(payload) : leadsApi.add(payload)
   modalOpen.value = false
 }
@@ -501,26 +500,26 @@ const exportColumns = computed(() => [
     <ModalDialog :open="modalOpen" :title="form.id ? 'Leadni tahrirlash' : 'Yangi lead qo\'shish'"
       @close="modalOpen = false" @submit="save">
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <FormField label="1. Ism Familiya" required :error="errors.name">
+        <FormField label="1. Ism Familiya">
           <input v-model="form.name" class="field" placeholder="Ism Familiya kiriting" />
         </FormField>
 
-        <FormField label="2. Telefon raqam" required :error="errors.phone">
+        <FormField label="2. Telefon raqam">
           <PhoneInput v-model="form.phone" />
         </FormField>
 
-        <FormField label="3. Qaysi tur" required :error="errors.tour">
+        <FormField label="3. Qaysi tur">
           <select v-model="form.tour" class="field">
-            <option value="" disabled>Turni tanlang</option>
+            <option value="">Turni tanlang</option>
             <option v-for="t in db.tours" :key="t.id" :value="t.name">{{ t.name }}</option>
           </select>
         </FormField>
 
-        <FormField label="4. Nechta odam" required :error="errors.people">
+        <FormField label="4. Nechta odam">
           <input v-model="form.people" type="number" min="1" class="field" placeholder="Masalan: 2" />
         </FormField>
 
-        <FormField label="5. Summa (USD)" required :error="errors.amount" hint="Masalan: 1850">
+        <FormField label="5. Summa (USD)" hint="Masalan: 1850">
           <input v-model="form.amount" type="number" min="0" step="10" class="field" placeholder="1850" />
         </FormField>
 
@@ -531,13 +530,13 @@ const exportColumns = computed(() => [
           </select>
         </FormField>
 
-        <FormField label="7. Manba" required>
+        <FormField label="7. Manba">
           <select v-model="form.source" class="field">
             <option v-for="s in leadSourceNames" :key="s" :value="s">{{ s }}</option>
           </select>
         </FormField>
 
-        <FormField label="8. Bosqich" required>
+        <FormField label="8. Bosqich">
           <select v-model="form.stage" class="field">
             <option v-for="s in leadStages" :key="s" :value="s">{{ s }}</option>
           </select>

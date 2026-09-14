@@ -69,13 +69,15 @@ class EmployeeUpdate(Loose):
 
 
 class LeadIn(Loose):
-    name: str
+    # Barcha maydonlar ixtiyoriy — frontend forma bo'sh maydonlar bilan ham
+    # saqlashi mumkin, shuning uchun bu yerda `required` maydon yo'q.
+    name: str = ""
     phone: str = ""
     tour: str = ""
-    people: int = 1
+    people: int = 0
     amount: float = 0
     manager: str = ""
-    source: str = "Telegram"
+    source: str = ""
     stage: str = "Yangi"
 
 
