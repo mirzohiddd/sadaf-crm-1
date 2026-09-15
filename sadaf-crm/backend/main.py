@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,19 +17,28 @@ from app.routers import (
     integrations,
     leads,
     notifications,
+    reminders,
     reports,
     settings,
     tasks,
 )
 from app.security import decode_token
+from app.services import reminders as reminders_service
 from app.services.realtime import manager as realtime_manager
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     seed.run()
     realtime_manager.bind_loop(asyncio.get_running_loop())
+    # Lead eslatmalari uchun fon vazifasi: davriy ravishda vaqti kelgan
+    # eslatmalarni topib, bildirishnoma yuboradi (pastda check_due()).
+    reminder_task = asyncio.create_task(reminders_service.run_forever())
     print(f"[sadaf] AI: {'anthropic' if ai_enabled() else 'offline (rule-based)'}")
     print("[sadaf] Real vaqtli sinxronizatsiya (WebSocket): yoqilgan")
+    print("[sadaf] Lead eslatmalari: fon vazifasi yoqilgan (har 20s tekshiradi)")
     yield
+    reminder_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await reminder_task
 
 
 app = FastAPI(
@@ -57,6 +67,7 @@ for router in (
     crud.sales_router,
     tasks.router,
     notifications.router,
+    reminders.router,
     attendance.router,
     insights.dashboard_router,
     insights.analytics_router,

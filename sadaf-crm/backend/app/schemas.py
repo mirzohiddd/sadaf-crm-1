@@ -178,6 +178,21 @@ class TaskUpdate(Loose):
     pass
 
 
+# ——— Lead eslatmalari (Reminder) ———
+
+
+class ReminderIn(Loose):
+    """Lead ichidan qo'yiladigan eslatma.
+
+    ``date`` — ``YYYY-MM-DD`` (HTML ``<input type="date">`` formati),
+    ``time`` — ``HH:MM`` (HTML ``<input type="time">`` formati).
+    """
+
+    date: str
+    time: str = "09:00"
+    note: str = ""
+
+
 # ——— Sozlamalar / davomat / AI ———
 
 

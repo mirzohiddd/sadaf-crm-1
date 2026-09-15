@@ -32,6 +32,7 @@ COLLECTIONS = (
     "activity",
     "lead_assignment",
     "analytics_goals",
+    "reminders",
 )
 
 _locks: dict[str, threading.RLock] = {name: threading.RLock() for name in COLLECTIONS}

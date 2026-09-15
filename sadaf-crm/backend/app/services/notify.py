@@ -15,6 +15,7 @@ ENTITY_LABEL = {
     "employee": "Hodim",
     "task": "Vazifa",
     "sale": "Savdo",
+    "reminder": "Eslatma",
 }
 
 
