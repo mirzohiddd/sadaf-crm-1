@@ -110,6 +110,7 @@ export function signOut() {
   persistUser(null)
   Object.keys(db).forEach((k) => { db[k] = [] })
   leadBadge.count = 0
+  clearLeadReminders()
   ui.ready = false
   disconnectRealtime()
   resetAppearanceLocal()
@@ -257,6 +258,11 @@ function handleRealtimeMessage(data) {
   // Yangi lead kelganda yoki biror joyda ko'rilgan deb belgilanganda —
   // "Ledlar" menyusidagi belgi ham darhol yangilanadi.
   if (collection === 'leads') loadLeadsNewCount()
+  // Eslatma qo'shilsa/bajarilsa/vaqti kelib xabar berilsa — hozir ochiq
+  // turgan lead panelidagi eslatmalar ro'yxati ham darhol yangilanadi.
+  if (collection === 'reminders' && leadReminders.leadId != null) {
+    loadLeadReminders(leadReminders.leadId)
+  }
   // 'settings' va 'ai_chats' — shaxsiy ma'lumot, boshqa hodimga signal
   // yuborilmaydi va bu yerda e'tiborsiz qoldiriladi.
 }
@@ -414,6 +420,64 @@ export const notificationsApi = {
 }
 
 export const unreadCount = computed(() => db.notifications.filter((n) => !n.read).length)
+
+// ————————————————————————————————————————————————
+//  Lead eslatmalari (Reminder)
+//
+//  Ro'yxat faqat hozir ochiq turgan lead paneli uchun yuklanadi (backend
+//  leadga bog'liq holda beradi: GET /api/leads/{id}/reminders). Belgilangan
+//  vaqt kelganda backend fon vazifasi bildirishnoma yuboradi — u
+//  db.notifications orqali allaqachon real vaqtda yangilanadi. Bu yerda esa
+//  ochiq lead panelidagi eslatmalar ro'yxati ham WebSocket signali bilan
+//  o'zi yangilanadi (masalan boshqa hodim o'sha leadga eslatma qo'ysa).
+// ————————————————————————————————————————————————
+
+export const leadReminders = reactive({ leadId: null, items: [] })
+
+export async function loadLeadReminders(leadId) {
+  leadReminders.leadId = leadId
+  const rows = await safe(api.remindersApi.listForLead(leadId), [])
+  // Yuklanayotganda foydalanuvchi boshqa leadni ochib ulgurgan bo'lishi mumkin
+  if (leadReminders.leadId === leadId) leadReminders.items = rows || []
+}
+
+export function clearLeadReminders() {
+  leadReminders.leadId = null
+  leadReminders.items = []
+}
+
+export const leadRemindersApi = {
+  add: async (leadId, payload) => {
+    try {
+      await api.remindersApi.create(leadId, payload)
+      await loadLeadReminders(leadId)
+      return true
+    } catch (err) {
+      fail(err)
+      return false
+    }
+  },
+  toggle: async (id) => {
+    const item = leadReminders.items.find((r) => r.id === id)
+    if (item) item.done = !item.done // optimistik
+    try {
+      await api.remindersApi.toggleDone(id)
+    } catch (err) {
+      if (item) item.done = !item.done
+      fail(err)
+    }
+  },
+  remove: async (id) => {
+    const prev = leadReminders.items
+    leadReminders.items = prev.filter((r) => r.id !== id) // optimistik
+    try {
+      await api.remindersApi.remove(id)
+    } catch (err) {
+      leadReminders.items = prev
+      fail(err)
+    }
+  }
+}
 
 // ——— Davomat ———
 

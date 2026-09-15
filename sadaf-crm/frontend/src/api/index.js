@@ -61,6 +61,12 @@ export const notificationsApi = {
   markAllRead: () => http.patch('/notifications/read-all'),
   remove: (id) => http.del(`/notifications/${id}`)
 }
+export const remindersApi = {
+  listForLead: (leadId) => http.get(`/leads/${leadId}/reminders`),
+  create: (leadId, payload) => http.post(`/leads/${leadId}/reminders`, payload),
+  toggleDone: (id) => http.patch(`/reminders/${id}/done`),
+  remove: (id) => http.del(`/reminders/${id}`)
+}
 export const attendanceApi = {
   today: () => http.get('/attendance/today'),
   history: () => http.get('/attendance'),

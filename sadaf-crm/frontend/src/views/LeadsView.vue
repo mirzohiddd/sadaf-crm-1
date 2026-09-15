@@ -9,7 +9,10 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import SourceTag from '@/components/SourceTag.vue'
 import ToolbarButton from '@/components/ToolbarButton.vue'
 import AppIcon from '@/components/AppIcon.vue'
-import { db, leadsApi, moveLead, isSuperAdmin, markLeadSeen } from '@/store'
+import {
+  db, leadsApi, moveLead, isSuperAdmin, markLeadSeen,
+  leadReminders, loadLeadReminders, clearLeadReminders, leadRemindersApi
+} from '@/store'
 import { leadStageList, leadStages, leadSourceNames } from '@/data/mock.js'
 import { todayUz, money, exportCsv } from '@/utils/format.js'
 
@@ -150,8 +153,9 @@ function openDetail(lead) {
   selected.value = lead.id
   openMenu.value = null
   markLeadSeen(lead.id)
+  loadLeadReminders(lead.id)
 }
-const closeDetail = () => { selected.value = null }
+const closeDetail = () => { selected.value = null; clearLeadReminders() }
 
 function editFromPanel(lead) {
   selected.value = null
@@ -165,6 +169,55 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 // Lead o'chib ketsa panel ham yopiladi
 watch(selectedLead, (v) => { if (selected.value != null && !v) selected.value = null })
+
+// ——— Eslatma / Reminder (lead detal paneli ichida) ———
+
+const showReminderForm = ref(false)
+const reminderSaving = ref(false)
+const reminderError = ref('')
+
+function emptyReminderForm() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1) // qulaylik uchun — ertangi sana oldindan tanlangan
+  const p = (n) => String(n).padStart(2, '0')
+  return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: '09:00', note: '' }
+}
+
+const reminderForm = reactive(emptyReminderForm())
+
+function toggleReminderForm() {
+  showReminderForm.value = !showReminderForm.value
+  reminderError.value = ''
+  if (showReminderForm.value) Object.assign(reminderForm, emptyReminderForm())
+}
+
+async function submitReminder() {
+  if (!reminderForm.date) {
+    reminderError.value = 'Sanani tanlang.'
+    return
+  }
+  reminderError.value = ''
+  reminderSaving.value = true
+  const ok = await leadRemindersApi.add(selectedLead.value.id, { ...reminderForm })
+  reminderSaving.value = false
+  if (!ok) {
+    reminderError.value = "Eslatmani saqlab bo'lmadi. Qaytadan urinib ko'ring."
+    return
+  }
+  showReminderForm.value = false
+}
+
+// Ro'yxatda ko'rsatish uchun "YYYY-MM-DD" -> "DD.MM.YYYY"
+function fmtReminderDate(iso) {
+  const [y, m, d] = String(iso || '').split('-')
+  return y && m && d ? `${d}.${m}.${y}` : (iso || '')
+}
+
+function reminderOverdue(r) {
+  if (r.done) return false
+  const due = new Date(`${r.date}T${r.time || '00:00'}`)
+  return !Number.isNaN(due.getTime()) && due.getTime() < Date.now()
+}
 
 const detailRows = computed(() => {
   const l = selectedLead.value
@@ -478,6 +531,62 @@ const exportColumns = computed(() => [
               </span>
             </div>
           </dl>
+
+          <!-- ⏰ Eslatmalar (Reminder) -->
+          <div class="mt-5 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">⏰ Eslatmalar</h3>
+            <button class="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+              @click="toggleReminderForm">
+              <AppIcon :name="showReminderForm ? 'close' : 'plus'" class="h-3.5 w-3.5" />
+              {{ showReminderForm ? 'Yopish' : "Eslatma qo'yish" }}
+            </button>
+          </div>
+
+          <!-- Yangi eslatma formasi -->
+          <div v-if="showReminderForm" class="mt-2.5 space-y-2.5 rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+            <div class="grid grid-cols-2 gap-2">
+              <input v-model="reminderForm.date" type="date" class="field bg-white py-2 text-sm" />
+              <input v-model="reminderForm.time" type="time" class="field bg-white py-2 text-sm" />
+            </div>
+            <textarea v-model="reminderForm.note" rows="2" class="field resize-y bg-white py-2 text-sm"
+              placeholder="Izoh (masalan: qo'ng'iroq qilish, taklif yuborish...)" />
+            <p v-if="reminderError" class="text-xs text-rose-600">{{ reminderError }}</p>
+            <button class="w-full rounded-lg bg-amber-500 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+              :disabled="reminderSaving" @click="submitReminder">
+              {{ reminderSaving ? 'Saqlanmoqda...' : 'Saqlash' }}
+            </button>
+          </div>
+
+          <!-- Eslatmalar ro'yxati -->
+          <ul v-if="leadReminders.items.length" class="mt-2.5 space-y-2">
+            <li v-for="r in leadReminders.items" :key="r.id"
+              class="flex items-start gap-2.5 rounded-xl border px-3 py-2.5"
+              :class="r.done ? 'border-slate-100 bg-slate-50' : (reminderOverdue(r) ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200 bg-white')">
+              <button class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition"
+                :class="r.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 hover:border-amber-400'"
+                :aria-label="r.done ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash'"
+                @click="leadRemindersApi.toggle(r.id)">
+                <AppIcon v-if="r.done" name="check-circle" class="h-3.5 w-3.5" />
+              </button>
+
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center gap-1.5 text-[12px] font-medium"
+                  :class="r.done ? 'text-slate-400 line-through' : (reminderOverdue(r) ? 'text-rose-600' : 'text-slate-800')">
+                  <AppIcon name="clock" class="h-3 w-3 shrink-0" />
+                  {{ fmtReminderDate(r.date) }} · {{ r.time }}
+                  <span v-if="reminderOverdue(r)" class="badge bg-rose-100 text-rose-700">Kechikkan</span>
+                </span>
+                <span v-if="r.note" class="mt-1 block break-words text-xs"
+                  :class="r.done ? 'text-slate-400 line-through' : 'text-slate-600'">{{ r.note }}</span>
+              </span>
+
+              <button class="shrink-0 rounded-md p-1 text-slate-300 hover:bg-slate-100 hover:text-rose-500"
+                aria-label="O'chirish" @click="leadRemindersApi.remove(r.id)">
+                <AppIcon name="trash" class="h-3.5 w-3.5" />
+              </button>
+            </li>
+          </ul>
+          <p v-else-if="!showReminderForm" class="mt-2.5 text-xs text-slate-400">Bu lead uchun eslatma yo'q.</p>
 
           <h3 class="mb-3 mt-5 text-sm font-semibold text-slate-900">Faoliyat tarixi</h3>
           <ol class="relative space-y-4 border-l border-slate-200 pl-4">

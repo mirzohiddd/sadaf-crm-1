@@ -1,14 +1,24 @@
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { db, notificationsApi } from '@/store'
 import { money } from '@/utils/format.js'
+
+const router = useRouter()
 
 const items = computed(() => db.notifications)
 const unread = computed(() => items.value.filter((n) => !n.read).length)
 
 // Oy bo'yicha umumiy balans (kirim - chiqim)
 const balance = computed(() => items.value.reduce((s, n) => s + Number(n.amount || 0), 0))
+
+// Bosilganda o'qilgan deb belgilanadi va (agar mavjud bo'lsa) tegishli
+// bo'limga o'tadi — masalan Lead eslatmasi bosilsa "Ledlar" sahifasi ochiladi.
+function openNotification(n) {
+  notificationsApi.markRead(n.id)
+  if (n.link) router.push(n.link)
+}
 </script>
 
 <template>
@@ -29,10 +39,13 @@ const balance = computed(() => items.value.reduce((s, n) => s + Number(n.amount 
       <li v-for="n in items" :key="n.id"
           class="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50"
           :class="n.read ? '' : 'bg-blue-50/40'"
-          @click="notificationsApi.markRead(n.id)">
+          @click="openNotification(n)">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-              :class="n.dir === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'">
-          <AppIcon name="chevron" class="h-4 w-4" :class="n.dir === 'up' ? 'rotate-180' : ''" />
+              :class="n.kind === 'reminder'
+                ? 'bg-amber-50 text-amber-600'
+                : (n.dir === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')">
+          <AppIcon :name="n.kind === 'reminder' ? 'bell' : 'chevron'" class="h-4 w-4"
+                   :class="n.kind !== 'reminder' && n.dir === 'up' ? 'rotate-180' : ''" />
         </span>
 
         <span class="min-w-0 flex-1">
