@@ -447,14 +447,17 @@ export function clearLeadReminders() {
 }
 
 export const leadRemindersApi = {
+  // ok=false bo'lganda message ham qaytadi — komponent generic xabar
+  // o'rniga backend qaytargan aniq sababni (403, 500, tarmoq xatosi h.k.)
+  // foydalanuvchiga ko'rsata oladi.
   add: async (leadId, payload) => {
     try {
       await api.remindersApi.create(leadId, payload)
       await loadLeadReminders(leadId)
-      return true
+      return { ok: true }
     } catch (err) {
       fail(err)
-      return false
+      return { ok: false, message: err?.message || '' }
     }
   },
   toggle: async (id) => {

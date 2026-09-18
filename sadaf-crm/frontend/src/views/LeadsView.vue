@@ -191,17 +191,33 @@ function toggleReminderForm() {
   if (showReminderForm.value) Object.assign(reminderForm, emptyReminderForm())
 }
 
+// Vaqt har doim 24-soatlik "HH:MM" matn ko'rinishida saqlanadi. Bu native
+// <input type="time"> o'rniga ishlatiladi, chunki uning AM/PM yoki 24-soat
+// ko'rinishida chiqishi brauzer/OS tiliga bog'liq bo'lib, foydalanuvchi
+// buni boshqara olmaydi. Matn maydoni esa har doim bir xil formatda ishlaydi.
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+// Kiritilayotganda raqamlarni avtomatik "HH:MM" ko'rinishiga keltiradi.
+function onTimeInput(e) {
+  const digits = e.target.value.replace(/\D/g, '').slice(0, 4)
+  reminderForm.time = digits.length >= 3 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits
+}
+
 async function submitReminder() {
   if (!reminderForm.date) {
     reminderError.value = 'Sanani tanlang.'
     return
   }
+  if (!TIME_RE.test(reminderForm.time)) {
+    reminderError.value = "Vaqtni to'g'ri kiriting (soat:daqiqa, masalan 14:30)."
+    return
+  }
   reminderError.value = ''
   reminderSaving.value = true
-  const ok = await leadRemindersApi.add(selectedLead.value.id, { ...reminderForm })
+  const result = await leadRemindersApi.add(selectedLead.value.id, { ...reminderForm })
   reminderSaving.value = false
-  if (!ok) {
-    reminderError.value = "Eslatmani saqlab bo'lmadi. Qaytadan urinib ko'ring."
+  if (!result.ok) {
+    reminderError.value = result.message || "Eslatmani saqlab bo'lmadi. Qaytadan urinib ko'ring."
     return
   }
   showReminderForm.value = false
@@ -546,7 +562,8 @@ const exportColumns = computed(() => [
           <div v-if="showReminderForm" class="mt-2.5 space-y-2.5 rounded-xl border border-amber-100 bg-amber-50/50 p-3">
             <div class="grid grid-cols-2 gap-2">
               <input v-model="reminderForm.date" type="date" class="field bg-white py-2 text-sm" />
-              <input v-model="reminderForm.time" type="time" class="field bg-white py-2 text-sm" />
+              <input :value="reminderForm.time" @input="onTimeInput" type="text" inputmode="numeric"
+                maxlength="5" placeholder="14:30" class="field bg-white py-2 text-sm" />
             </div>
             <textarea v-model="reminderForm.note" rows="2" class="field resize-y bg-white py-2 text-sm"
               placeholder="Izoh (masalan: qo'ng'iroq qilish, taklif yuborish...)" />
