@@ -11,12 +11,19 @@ from __future__ import annotations
 import json
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from .config import DATA_DIR
 from .services.realtime import notify_collection_changed
+
+# O'zbekiston (Asia/Tashkent) doim UTC+5 — yozgi vaqtga o'tish yo'q. Shuning
+# uchun tashqi kutubxona (zoneinfo/tzdata) shart emas: bu offset serverning
+# qayerda joylashganidan (masalan Render — odatda UTC) qat'i nazar har doim
+# to'g'ri bo'ladi. Eslatmalar (reminders) va barcha ko'rsatiladigan
+# sana/vaqtlar shu zonaga nisbatan hisoblanadi.
+TASHKENT_TZ = timezone(timedelta(hours=5), name="Asia/Tashkent")
 
 COLLECTIONS = (
     "users",
@@ -54,13 +61,20 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def now_tashkent() -> datetime:
+    """Joriy vaqtni doim Asia/Tashkent (UTC+5) zonasida qaytaradi —
+    serverning haqiqiy joylashuvidan (Render'da odatda UTC) qat'i nazar."""
+    return datetime.now(TASHKENT_TZ)
+
+
 def today_uz() -> str:
-    """Frontend ishlatadigan DD.MM.YYYY formati."""
-    return datetime.now().strftime("%d.%m.%Y")
+    """Frontend ishlatadigan DD.MM.YYYY formati (Asia/Tashkent bo'yicha)."""
+    return now_tashkent().strftime("%d.%m.%Y")
 
 
 def now_time() -> str:
-    return datetime.now().strftime("%H:%M")
+    """HH:MM, Asia/Tashkent bo'yicha."""
+    return now_tashkent().strftime("%H:%M")
 
 
 def read(name: str) -> list[dict[str, Any]]:
