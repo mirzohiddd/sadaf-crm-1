@@ -1,0 +1,17 @@
+{
+  "builds": [
+    {
+      "src": "sadaf-crm/frontend/package.json",
+      "use": "@vercel/vite"
+    }
+  ],
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/sadaf-crm/frontend/index.html"
+    }
+  ]
+}
