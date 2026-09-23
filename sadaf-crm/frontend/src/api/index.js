@@ -27,7 +27,9 @@ export const leadsApi = {
   update: (id, payload) => http.put(`/leads/${id}`, payload),
   moveStage: (id, stage) => http.patch(`/leads/${id}/stage`, { stage }),
   markSeen: (id) => http.patch(`/leads/${id}/seen`),
-  remove: (id) => http.del(`/leads/${id}`)
+  remove: (id) => http.del(`/leads/${id}`),
+  addComment: (id, text) => http.post(`/leads/${id}/comments`, { text }),
+  removeComment: (id, commentId) => http.del(`/leads/${id}/comments/${commentId}`)
 }
 export const clientsApi = {
   list: () => http.get('/clients'),

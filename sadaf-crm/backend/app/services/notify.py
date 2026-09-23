@@ -114,4 +114,6 @@ def activity_text(row: dict[str, Any]) -> str:
         return f"{what} o'chirildi"
     if action == "done":
         return "Vazifa bajarildi"
+    if action == "comment":
+        return f"{what}ga kommentariya qo'shildi"
     return what

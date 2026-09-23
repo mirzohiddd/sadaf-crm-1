@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import re
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import storage
 from ..deps import ensure_access, is_global, require, scope_rows
-from ..schemas import LeadIn, Loose, StageIn
+from ..schemas import LeadCommentIn, LeadIn, Loose, StageIn
 from ..services import notify
 from ..services import assignment
 from ..services.crm import WON_STAGES
@@ -109,6 +110,78 @@ def _sync_client(lead: dict[str, Any]) -> None:
         storage.insert("clients", patch)
 
 
+# ——— Kommentariyalar (lead formasidagi 11-bo'lim) ———
+
+
+def _new_comment(text: str, user: dict[str, Any] | None) -> dict[str, Any]:
+    return {
+        "id": uuid.uuid4().hex[:12],
+        "text": text.strip(),
+        "date": f"{storage.today_uz()} {storage.now_time()}",
+        "author": (user or {}).get("name", ""),
+        "authorId": int(user["id"]) if user else None,
+    }
+
+
+def _comments_of(lead: dict[str, Any]) -> list[dict[str, Any]]:
+    """Lead kommentariyalari ro'yxati.
+
+    Eski leadlarda (yoki Sheets/sayt orqali kelganlarda) faqat bitta
+    ``comment`` matni bo'ladi — u ro'yxatning birinchi yozuviga aylanadi,
+    shunda hech narsa yo'qolmaydi.
+    """
+    if isinstance(lead.get("comments"), list):
+        return list(lead["comments"])
+    legacy = str(lead.get("comment") or "").strip()
+    if not legacy:
+        return []
+    return [{
+        "id": uuid.uuid4().hex[:12],
+        "text": legacy,
+        "date": f"{lead.get('date', '')} {lead.get('time', '')}".strip(),
+        "author": "",
+        "authorId": None,
+    }]
+
+
+def _comments_patch(comments: list[dict[str, Any]]) -> dict[str, Any]:
+    """``comment`` maydoni oxirgi kommentariya bilan sinxron turadi —
+    qidiruv, Excel eksport va boshqa eski kodlar o'zgarishsiz ishlaydi."""
+    return {"comments": comments, "comment": comments[-1]["text"] if comments else ""}
+
+
+@router.post("/{lead_id}/comments", status_code=status.HTTP_201_CREATED)
+def add_comment(
+    lead_id: int, body: LeadCommentIn, user: dict[str, Any] = Depends(require("leads", "write"))
+) -> dict[str, Any]:
+    current = ensure_access(storage.get_one("leads", lead_id), user, resource="leads")
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Kommentariya bo'sh bo'lishi mumkin emas.")
+    comments = _comments_of(current)
+    comments.append(_new_comment(text, user))
+    updated = storage.update("leads", lead_id, _comments_patch(comments))
+    notify.log(user.get("name", ""), "comment", "lead", current.get("name", ""),
+               {"text": text[:120]}, actor_id=int(user["id"]))
+    return updated or current
+
+
+@router.delete("/{lead_id}/comments/{comment_id}")
+def delete_comment(
+    lead_id: int, comment_id: str, user: dict[str, Any] = Depends(require("leads", "write"))
+) -> dict[str, Any]:
+    current = ensure_access(storage.get_one("leads", lead_id), user, resource="leads")
+    comments = _comments_of(current)
+    target = next((c for c in comments if str(c.get("id")) == comment_id), None)
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kommentariya topilmadi.")
+    # Faqat muallifning o'zi yoki Super Admin o'chira oladi
+    if not is_global(user, "leads") and target.get("authorId") != int(user["id"]):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Faqat o'z kommentariyangizni o'chira olasiz.")
+    comments = [c for c in comments if c is not target]
+    return storage.update("leads", lead_id, _comments_patch(comments)) or current
+
+
 @router.get("")
 def list_leads(user: dict[str, Any] = Depends(require("leads", "read"))) -> list[dict[str, Any]]:
     return scope_rows(storage.read("leads"), user, resource="leads")
@@ -177,6 +250,9 @@ def create_lead(body: LeadIn, user: dict[str, Any] = Depends(require("leads", "w
     # Yaratuvchi leadni allaqachon ko'rgan hisoblanadi — badge unga yangi
     # ko'rsatilmaydi, boshqa barcha adminlar uchun esa "yangi" bo'lib qoladi.
     data["seenBy"] = [int(user["id"])]
+    # Formadagi birinchi kommentariya tarixning birinchi yozuviga aylanadi
+    first = str(data.get("comment") or "").strip()
+    data.update(_comments_patch([_new_comment(first, user)] if first else []))
 
     # Operator va oddiy Admin leadni faqat o'ziga biriktira oladi — "Mas'ul
     # odam"ni tanlay olmaydi. Faqat Super Admin (leads uchun global rol)
@@ -217,7 +293,10 @@ def update_lead(
     # "seenBy" faqat /seen endpoint orqali o'zgaradi — oddiy tahrirlash uni
     # qayta yozib yubormasligi kerak (frontend forma lead obyektini to'liq
     # nusxalab yuborgani uchun bu maydon patch ichida bo'lishi mumkin).
-    patch = {k: v for k, v in body.model_dump().items() if k not in ("id", "ownerId", "seenBy")}
+    # "comments"/"comment" ham faqat /comments endpointlari orqali o'zgaradi —
+    # aks holda ochiq turgan eski forma boshqa hodim qo'shgan kommentariyani
+    # o'chirib yuborishi mumkin edi.
+    patch = {k: v for k, v in body.model_dump().items() if k not in ("id", "ownerId", "seenBy", "comments", "comment")}
 
     # Operator va oddiy Admin "Mas'ul odam"ni o'zgartira olmaydi — bu maydon
     # faqat Super Admin uchun ochiq.

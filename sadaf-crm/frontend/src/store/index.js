@@ -346,6 +346,46 @@ export async function moveLead(id, stage) {
   }
 }
 
+// ——— Lead kommentariyalari (formadagi 11-bo'lim) ———
+
+/**
+ * Leadning kommentariyalar ro'yxati (eskidan yangiga).
+ * Eski leadlarda faqat bitta `comment` matni bo'ladi — u birinchi yozuv
+ * sifatida ko'rsatiladi (backend birinchi yangi qo'shilganda uni ko'chiradi).
+ */
+export function leadComments(lead) {
+  if (!lead) return []
+  if (Array.isArray(lead.comments)) return lead.comments
+  const legacy = String(lead.comment || '').trim()
+  return legacy
+    ? [{ id: 'legacy', text: legacy, date: `${lead.date || ''} ${lead.time || ''}`.trim(), author: '', authorId: null }]
+    : []
+}
+
+export const leadCommentsApi = {
+  add: async (leadId, text) => {
+    try {
+      const row = await api.leadsApi.addComment(leadId, text)
+      upsert('leads', row)
+      refresh(['activity'])
+      return { ok: true, row }
+    } catch (err) {
+      fail(err)
+      return { ok: false, message: err?.message || '' }
+    }
+  },
+  remove: async (leadId, commentId) => {
+    try {
+      const row = await api.leadsApi.removeComment(leadId, commentId)
+      upsert('leads', row)
+      return true
+    } catch (err) {
+      fail(err)
+      return false
+    }
+  }
+}
+
 // ——— Vazifalar ———
 
 export const tasksApi = {
@@ -536,6 +576,7 @@ export function activityText(a) {
   if (a?.action === 'update') return `${what} tahrirlandi`
   if (a?.action === 'delete') return `${what} o'chirildi`
   if (a?.action === 'done') return 'Vazifa bajarildi'
+  if (a?.action === 'comment') return `${what}ga kommentariya qo'shildi`
   return what
 }
 

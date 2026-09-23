@@ -9,6 +9,7 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import SourceTag from '@/components/SourceTag.vue'
 import ToolbarButton from '@/components/ToolbarButton.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import LeadComments from '@/components/LeadComments.vue'
 import {
   db, leadsApi, moveLead, isSuperAdmin, markLeadSeen,
   leadReminders, loadLeadReminders, clearLeadReminders, leadRemindersApi
@@ -84,14 +85,22 @@ const form = reactive(emptyForm())
 const errors = reactive({})
 const clearErrors = () => Object.keys(errors).forEach((k) => delete errors[k])
 
+// 11. Kommentariyalar — yozilayotgan (hali saqlanmagan) matn
+const commentDraft = ref('')
+const commentsRef = ref(null)
+// Modal ochiq turganda ham kommentariyalar ro'yxati jonli yangilanadi
+const formLead = computed(() => (form.id == null ? null : db.leads.find((l) => l.id === form.id) || null))
+
 function openCreate(stage = 'Yangi') {
   Object.assign(form, emptyForm(), { stage })
+  commentDraft.value = ''
   clearErrors()
   modalOpen.value = true
 }
 
 function openEdit(lead) {
   Object.assign(form, emptyForm(), { ...lead })
+  commentDraft.value = ''
   clearErrors()
   openMenu.value = null
   modalOpen.value = true
@@ -104,14 +113,23 @@ function validate() {
   return true
 }
 
-function save() {
+async function save() {
   if (!validate()) return
+  const { comments, comment, ...rest } = form
   const payload = {
-    ...form,
+    ...rest,
     people: form.people === '' ? 0 : Number(form.people) || 0,
     amount: form.amount === '' ? 0 : Number(form.amount) || 0
   }
-  form.id ? leadsApi.update(payload) : leadsApi.add(payload)
+  if (form.id) {
+    // Kommentariyalar alohida endpoint orqali saqlanadi; yozib qo'yilgan,
+    // lekin "Saqlash" bosilmagan matn ham yo'qolmasin.
+    await commentsRef.value?.flush()
+    leadsApi.update(payload)
+  } else {
+    // Yangi leadda yozilgan matn birinchi kommentariya bo'ladi
+    leadsApi.add({ ...payload, comment: commentDraft.value.trim() })
+  }
   modalOpen.value = false
 }
 
@@ -144,12 +162,14 @@ function confirmDelete() {
 // ——— O'ng tomondagi detal paneli ———
 
 const selected = ref(null)
+const panelCommentDraft = ref('')
 
 const selectedLead = computed(() =>
   selected.value == null ? null : db.leads.find((l) => l.id === selected.value) || null
 )
 
 function openDetail(lead) {
+  if (selected.value !== lead.id) panelCommentDraft.value = ''
   selected.value = lead.id
   openMenu.value = null
   markLeadSeen(lead.id)
@@ -249,7 +269,6 @@ const detailRows = computed(() => {
   }
   rows.push(
     { label: 'Shahar', value: l.city || 'Toshkent', icon: 'map', tone: 'text-slate-600 bg-slate-100' },
-    { label: 'Izoh', value: l.comment || '—', icon: 'chat', tone: 'text-amber-600 bg-amber-50' },
     { label: 'Sana', value: `${l.date}  ${l.time || ''}`.trim(), icon: 'calendar', tone: 'text-slate-600 bg-slate-100' }
   )
   // Google Sheets (Meta Lead Ads) orqali kelgan leadlarda qo'shimcha
@@ -548,6 +567,16 @@ const exportColumns = computed(() => [
             </div>
           </dl>
 
+          <!-- 💬 Kommentariyalar -->
+          <h3 class="mb-2.5 mt-5 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            💬 Kommentariyalar
+            <span v-if="selectedLead.comments?.length"
+              class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">
+              {{ selectedLead.comments.length }}
+            </span>
+          </h3>
+          <LeadComments v-model="panelCommentDraft" :lead="selectedLead" compact />
+
           <!-- ⏰ Eslatmalar (Reminder) -->
           <div class="mt-5 flex items-center justify-between">
             <h3 class="text-sm font-semibold text-slate-900">⏰ Eslatmalar</h3>
@@ -678,9 +707,8 @@ const exportColumns = computed(() => [
       </div>
 
       <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <FormField label="11. Kommentariya" class="sm:col-span-2">
-          <textarea v-model="form.comment" rows="3" class="field resize-y"
-            placeholder="Izoh yoki qo'shimcha ma'lumot kiriting..." />
+        <FormField label="11. Kommentariyalar" class="sm:col-span-2">
+          <LeadComments ref="commentsRef" v-model="commentDraft" :lead="formLead" start-open />
         </FormField>
 
         <FormField label="12. Sana" hint="Sana avtomatik qo'yiladi">

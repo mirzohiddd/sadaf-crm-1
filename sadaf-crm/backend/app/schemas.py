@@ -85,6 +85,12 @@ class StageIn(BaseModel):
     stage: str
 
 
+class LeadCommentIn(BaseModel):
+    """Leadga yangi kommentariya (11-bo'lim). Vaqt va muallif serverda qo'yiladi."""
+
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class SheetLeadIn(Loose):
     """Google Sheets Apps Script yuboradigan bitta qator (yangi lead).
 
